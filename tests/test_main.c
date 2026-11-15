@@ -135,6 +135,10 @@ static void test_text_frontend(void)
     check_phonemes_contain("Really?", "?");
     check_phonemes_contain("Wait... what", "...");
     check_phonemes_contain("one, two", ",");
+    check_phonemes_contain("caf\xC3\xA9", "K AE0 F EY1");                 /* accented letters */
+    check_phonemes_contain("Bj\xC3\xB6rk", "B JH");                   /* one word, not two */
+    check_phonemes_contain("\xD0\x9F\xD1\x80\xD0\xB8 hi", "HH AY1"); /* unknown script is skipped */
+    check_phonemes_equal("5 \xC3\x97 3", "F AY1 V | TH R IY1");        /* the multiplication sign is not a letter */
 }
 
 static void test_utterance_events(void)

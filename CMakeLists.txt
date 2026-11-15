@@ -51,8 +51,8 @@ if(SPEEDSPEECH_BUILD_SHARED)
         set_target_properties(speedspeech PROPERTIES PREFIX "")
     endif()
     if(APPLE)
-        # Unity on macOS loads native plugins as .bundle (or .dylib)
-        set_target_properties(speedspeech PROPERTIES SUFFIX ".dylib")
+        # Unity / Mono resolve [DllImport("speedspeech")] to speedspeech.dylib
+        set_target_properties(speedspeech PROPERTIES PREFIX "" SUFFIX ".dylib")
     endif()
 endif()
 

@@ -6,12 +6,11 @@ out/
 .idea/
 *.user
 .DS_Store
-# Native plugin binaries are produced by CI / CMake, not committed
-bindings/unity/com.speedspeech.unity/Plugins/**/*.dll
-bindings/unity/com.speedspeech.unity/Plugins/**/*.so
-bindings/unity/com.speedspeech.unity/Plugins/**/*.dylib
-bindings/unity/com.speedspeech.unity/Plugins/**/*.a
+# Native plugin binaries are produced by CI (tools/package_unity.py), not committed
+bindings/unity/com.speedspeech.unity/Plugins/Windows*
+bindings/unity/com.speedspeech.unity/Plugins/Linux*
+bindings/unity/com.speedspeech.unity/Plugins/macOS*
+bindings/unity/com.speedspeech.unity/Plugins/Android*
 # Unreal intermediates
 bindings/unreal/SpeedSpeech/Binaries/
 bindings/unreal/SpeedSpeech/Intermediate/
-bindings/unreal/SpeedSpeech/Source/ThirdParty/SpeedSpeechCore/

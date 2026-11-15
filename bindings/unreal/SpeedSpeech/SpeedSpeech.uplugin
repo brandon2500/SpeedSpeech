@@ -1,0 +1,21 @@
+{
+    "FileVersion": 3,
+    "Version": 1,
+    "VersionName": "0.1.0",
+    "FriendlyName": "SpeedSpeech",
+    "Description": "Tiny, dependency-free formant speech synthesizer: streaming 3D voices, character presets, word and viseme events for subtitles and lip sync.",
+    "Category": "Audio",
+    "CreatedBy": "SpeedSpeech contributors",
+    "CreatedByURL": "https://github.com/brandon2500/SpeedSpeech",
+    "DocsURL": "https://github.com/brandon2500/SpeedSpeech",
+    "CanContainContent": false,
+    "IsBetaVersion": true,
+    "Installed": false,
+    "Modules": [
+        {
+            "Name": "SpeedSpeech",
+            "Type": "Runtime",
+            "LoadingPhase": "Default"
+        }
+    ]
+}

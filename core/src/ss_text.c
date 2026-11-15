@@ -500,6 +500,59 @@ static int txt_is_curly_apos(const unsigned char *s, int n, int i)
     return i + 2 < n && s[i] == 0xE2 && s[i + 1] == 0x80 && (s[i + 2] == 0x99 || s[i + 2] == 0x98);
 }
 
+
+/* ASCII spelling of U+00C0..U+00FF (two chars per code point, '\0' padded;
+ * "??" = not a letter) and U+0100..U+017F (one char each). */
+static const char txt_latin1[64 * 2 + 1] =
+    "A\0A\0A\0A\0A\0A\0AEC\0E\0E\0E\0E\0I\0I\0I\0I\0"
+    "D\0N\0O\0O\0O\0O\0O\0??O\0U\0U\0U\0U\0Y\0THss"
+    "a\0a\0a\0a\0a\0a\0aec\0e\0e\0e\0e\0i\0i\0i\0i\0"
+    "d\0n\0o\0o\0o\0o\0o\0??o\0u\0u\0u\0u\0y\0thy\0";
+static const char txt_latin_ext_a[128 + 1] =
+    "AaAaAaCcCcCcCcDdDdEeEeEeEeEeGgGgGgGgHhHhIiIiIiIiIiIiJjKkkLlLlLlLlLl"
+    "NnNnNnnNnOoOoOoOoRrRrRrSsSsSsSsTtTtTtUuUuUuUuUuUuWwYyYZzZzZzs";
+
+/* If a non-ASCII letter starts at s[i], return its byte length and write its
+ * ASCII spelling (0-2 chars) to out, its length to outlen. Returns 0 for anything that is
+ * not a letter (punctuation, symbols, invalid UTF-8). Letters from scripts
+ * we cannot pronounce are consumed with an empty spelling. */
+static int txt_utf8_letter(const unsigned char *s, int n, int i, char *out, int *outlen)
+{
+    unsigned cp;
+    int len;
+    unsigned char c = s[i];
+    *outlen = 0;
+    if (c < 0xC0) return 0;
+    if (c < 0xE0) { len = 2; cp = c & 0x1Fu; }
+    else if (c < 0xF0) { len = 3; cp = c & 0x0Fu; }
+    else if (c < 0xF8) { len = 4; cp = c & 0x07u; }
+    else return 0;
+    if (i + len > n) return 0;
+    {
+        int k;
+        for (k = 1; k < len; k++) {
+            if ((s[i + k] & 0xC0) != 0x80) return 0;
+            cp = (cp << 6) | (s[i + k] & 0x3Fu);
+        }
+    }
+    if (cp >= 0xC0 && cp <= 0xFF) {
+        const char *m = txt_latin1 + (cp - 0xC0) * 2;
+        if (m[0] == '?') return 0; /* multiplication / division sign */
+        out[(*outlen)++] = m[0];
+        if (m[1]) out[(*outlen)++] = m[1];
+        return len;
+    }
+    if (cp >= 0x100 && cp <= 0x17F) {
+        out[(*outlen)++] = txt_latin_ext_a[cp - 0x100];
+        return len;
+    }
+    /* general punctuation, symbols, CJK punctuation, fullwidth forms, emoji */
+    if (cp < 0x370 || (cp >= 0x2000 && cp <= 0x2BFF) || (cp >= 0x3000 && cp <= 0x303F) ||
+        (cp >= 0xFE30 && cp <= 0xFE6F) || (cp >= 0xFF00 && cp <= 0xFF20) || cp >= 0x1F000)
+        return 0;
+    return len; /* a letter we cannot pronounce */
+}
+
 static void txt_say_words(txt_state *st, const char *s, int word)
 {
     /* space-separated words, all mapped to the same word event */
@@ -541,6 +594,8 @@ void ss_text_process(const char *text, int flags, ss_tokens *out)
     txt_state st;
     int n, i = 0;
     int currency = 0; /* pending "$" */
+    char tl[4];
+    int tll = 0;
     st.t = out;
     st.sentence_flags = 0;
     st.words_in_sentence = 0;
@@ -572,14 +627,18 @@ void ss_text_process(const char *text, int flags, ss_tokens *out)
         }
 
         /* words */
-        if (txt_isalpha(c)) {
+        if (txt_isalpha(c) || (c >= 0xC0 && txt_utf8_letter(s, n, i, tl, &tll) > 0)) {
             char wbuf[128];
-            int wl = 0, s0 = i, w;
+            int wl = 0, s0 = i, w, ul;
             const char *ab;
             while (i < n) {
                 if (txt_isalpha(s[i])) {
                     if (wl < 120) wbuf[wl++] = (char)s[i];
                     i++;
+                } else if (s[i] >= 0xC0 && (ul = txt_utf8_letter(s, n, i, tl, &tll)) > 0) {
+                    int k;
+                    for (k = 0; k < tll; k++) if (wl < 120) wbuf[wl++] = tl[k];
+                    i += ul;
                 } else if (s[i] == '\'' && i + 1 < n && txt_isalpha(s[i + 1])) {
                     if (wl < 120) wbuf[wl++] = '\'';
                     i++;
@@ -592,7 +651,9 @@ void ss_text_process(const char *text, int flags, ss_tokens *out)
             }
             w = ss_tokens_add_word(out, s0, i - s0);
             ab = (i < n && s[i] == '.') ? txt_find_abbrev(wbuf, wl) : NULL;
-            if (ab) {
+            if (wl == 0) {
+                /* letters from a script we cannot pronounce */
+            } else if (ab) {
                 txt_say_words(&st, ab, w);
                 i++; /* swallow the abbreviation's period */
             } else {

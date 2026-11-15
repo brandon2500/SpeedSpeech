@@ -1,0 +1,17 @@
+build*/
+out/
+*.wav
+.vs/
+.vscode/
+.idea/
+*.user
+.DS_Store
+# Native plugin binaries are produced by CI / CMake, not committed
+bindings/unity/com.speedspeech.unity/Plugins/**/*.dll
+bindings/unity/com.speedspeech.unity/Plugins/**/*.so
+bindings/unity/com.speedspeech.unity/Plugins/**/*.dylib
+bindings/unity/com.speedspeech.unity/Plugins/**/*.a
+# Unreal intermediates
+bindings/unreal/SpeedSpeech/Binaries/
+bindings/unreal/SpeedSpeech/Intermediate/
+bindings/unreal/SpeedSpeech/Source/ThirdParty/SpeedSpeechCore/

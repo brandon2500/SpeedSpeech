@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  checks:
+    name: Sanitizers and generated files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lexicon is sorted
+        run: python3 tools/sort_lexicon.py --check
+      - name: Amalgamation is up to date
+        run: python3 tools/amalgamate.py --check
+      - name: Unity .meta files are up to date
+        run: |
+          python3 tools/package_unity.py
+          git diff --exit-code -- bindings/unity
+          test -z "$(git status --porcelain -- bindings/unity)"
+      - name: Address + undefined behaviour sanitizers
+        run: |
+          cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+          cmake --build build-asan --parallel
+          ctest --test-dir build-asan --output-on-failure
+      - name: Strict warnings (clang)
+        run: clang -std=c99 -Wall -Wextra -Wpedantic -Wconversion -Werror -Icore/include -fsyntax-only core/src/*.c
+
+  native:
+    name: Native plugin (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x86_64
+            os: windows-latest
+            cmake: -A x64
+            out: build/Release/speedspeech.dll
+            dest: Windows/x86_64
+          - name: linux-x86_64
+            os: ubuntu-latest
+            cmake: -DCMAKE_BUILD_TYPE=Release
+            out: build/libspeedspeech.so
+            dest: Linux/x86_64
+          - name: macos-universal
+            os: macos-latest
+            cmake: -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13
+            out: build/speedspeech.dylib
+            dest: macOS
+          - name: android-arm64-v8a
+            os: ubuntu-latest
+            android_abi: arm64-v8a
+            out: build/libspeedspeech.so
+            dest: Android/arm64-v8a
+          - name: android-armeabi-v7a
+            os: ubuntu-latest
+            android_abi: armeabi-v7a
+            out: build/libspeedspeech.so
+            dest: Android/armeabi-v7a
+          - name: android-x86_64
+            os: ubuntu-latest
+            android_abi: x86_64
+            out: build/libspeedspeech.so
+            dest: Android/x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        shell: bash
+        run: |
+          if [ -n "${{ matrix.android_abi }}" ]; then
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake" \
+              -DANDROID_ABI=${{ matrix.android_abi }} -DANDROID_PLATFORM=android-21 \
+              -DSPEEDSPEECH_BUILD_CLI=OFF -DSPEEDSPEECH_BUILD_TESTS=OFF
+          else
+            cmake -S . -B build ${{ matrix.cmake }} -DSPEEDSPEECH_BUILD_CLI=OFF -DSPEEDSPEECH_BUILD_TESTS=OFF
+          fi
+      - name: Build
+        run: cmake --build build --config Release --target speedspeech --parallel
+      - name: Stage
+        shell: bash
+        run: |
+          mkdir -p "plugins/${{ matrix.dest }}"
+          cp "${{ matrix.out }}" "plugins/${{ matrix.dest }}/"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.name }}
+          path: plugins
+
+  package:
+    name: Package Unity and Unreal plugins
+    needs: [test, checks, native]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: plugins
+          merge-multiple: true
+      - name: Assemble Unity package
+        run: python3 tools/package_unity.py --binaries plugins
+      - uses: actions/upload-artifact@v4
+        with:
+          name: com.speedspeech.unity
+          path: bindings/unity/com.speedspeech.unity
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SpeedSpeech-Unreal
+          path: bindings/unreal/SpeedSpeech

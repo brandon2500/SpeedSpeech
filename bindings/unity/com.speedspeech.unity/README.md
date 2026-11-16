@@ -6,10 +6,18 @@ for subtitles and lip sync.
 
 ## Install
 
-**From a CI build (recommended).** Download the `com.speedspeech.unity` artifact from the
-latest CI run. It already contains the native plugins for Windows, macOS, Linux and
-Android. Unzip it anywhere, then in Unity open **Window → Package Manager → + → Add
-package from disk…** and select its `package.json`.
+**From a release (recommended).** Download from the
+[latest release](https://github.com/brandon2500/SpeedSpeech/releases/latest). The packages
+already contain the native plugins for Windows, macOS, Linux and Android. Then do one of:
+
+- `com.speedspeech.unity-<version>.tgz`: in Unity, open **Window → Package Manager → + →
+  Add package from tarball…** and pick the file. Keep the file inside your project (for
+  example in a `Packages/` subfolder) so teammates resolve the same path.
+- `SpeedSpeech-Unity-<version>.zip`: unzip it into your project's `Packages/` folder. That
+  makes an embedded package you can edit.
+
+Without a release you can download the `com.speedspeech.unity` artifact from any CI run
+on the Actions tab and use **Add package from disk…** on its `package.json`.
 
 **From source.** Build the native library for your machine and copy it into the package:
 

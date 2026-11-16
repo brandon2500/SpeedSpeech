@@ -11,7 +11,10 @@ every platform Unreal targets.
 
 ## Install
 
-1. Copy this `SpeedSpeech` folder into your project's `Plugins/` folder.
+1. Download `SpeedSpeech-Unreal-<version>.zip` from the
+   [latest release](https://github.com/brandon2500/SpeedSpeech/releases/latest) and unzip
+   it into your project's `Plugins/` folder, so you get `Plugins/SpeedSpeech/`. Copying
+   this folder from the repository works too.
 2. Regenerate project files, build, and enable **SpeedSpeech** under *Edit → Plugins →
    Audio* if it isn't already enabled.
 

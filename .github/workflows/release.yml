@@ -1,0 +1,89 @@
+name: Release
+
+# Publishing a GitHub release (e.g. tag v0.1.0) builds everything and attaches
+# ready-to-use downloads to it. Run it manually to get the files as workflow
+# artifacts without publishing anything.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Attach downloads
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that the tag matches the code's version
+        if: github.event_name == 'release'
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          version="${tag#v}"
+          python3 - "$version" <<'PY'
+          import json, re, sys
+          v = sys.argv[1]
+          found = {
+              "package.json": json.load(open("bindings/unity/com.speedspeech.unity/package.json"))["version"],
+              "SpeedSpeech.uplugin": json.load(open("bindings/unreal/SpeedSpeech/SpeedSpeech.uplugin"))["VersionName"],
+              "ss_version_string": re.search(r'return "([^"]+)";', open("core/src/ss_engine.c").read().split("ss_version_string")[1]).group(1),
+              "SS_VERSION_*": ".".join(re.search(rf"#define SS_VERSION_{p} (\d+)", open("core/include/speedspeech.h").read()).group(1)
+                                       for p in ("MAJOR", "MINOR", "PATCH")),
+          }
+          bad = {k: x for k, x in found.items() if x != v}
+          if bad:
+              sys.exit(f"tag {v} does not match: {bad}")
+          print(f"version {v} ok")
+          PY
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: com.speedspeech.unity
+          path: staging/unity/com.speedspeech.unity
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: SpeedSpeech-Unreal
+          path: staging/unreal/SpeedSpeech
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: staging/native/SpeedSpeech-native
+          merge-multiple: true
+
+      - name: Package
+        run: |
+          set -e
+          version="${{ github.event.release.tag_name || 'dev' }}"
+          mkdir -p dist
+          cp core/include/speedspeech.h LICENSE staging/native/SpeedSpeech-native/
+          # Unity: a folder to drop into Packages/ or add from disk ...
+          (cd staging/unity && zip -qr "../../dist/SpeedSpeech-Unity-$version.zip" com.speedspeech.unity)
+          # ... and an npm-style tarball for "Add package from tarball"
+          mkdir -p staging/tgz && cp -r staging/unity/com.speedspeech.unity staging/tgz/package
+          tar -czf "dist/com.speedspeech.unity-$version.tgz" -C staging/tgz package
+          # Unreal: a SpeedSpeech/ folder to drop into the project's Plugins/
+          (cd staging/unreal && zip -qr "../../dist/SpeedSpeech-Unreal-$version.zip" SpeedSpeech)
+          # Native libraries + header for other engines
+          (cd staging/native && zip -qr "../../dist/SpeedSpeech-native-$version.zip" SpeedSpeech-native)
+          ls -l dist
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber --repo "${{ github.repository }}"
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'release'
+        with:
+          name: release-downloads
+          path: dist

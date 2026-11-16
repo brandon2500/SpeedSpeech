@@ -46,6 +46,19 @@ On a closed-set rhyme test, where the recognizer picks between minimal pairs lik
 *bat/pat/cat/hat*, it identifies **83%** of words correctly. Human listeners usually do
 better than a small recognizer does on synthetic speech.
 
+## Download
+
+Prebuilt packages are attached to each [release](https://github.com/brandon2500/SpeedSpeech/releases/latest):
+
+| File | What it is |
+|---|---|
+| `SpeedSpeech-Unity-<version>.zip` | Unity package with native plugins for Windows, macOS (Apple Silicon + Intel), Linux and Android. iOS and WebGL build from the included source. |
+| `com.speedspeech.unity-<version>.tgz` | The same Unity package, for **Package Manager → + → Add package from tarball…** |
+| `SpeedSpeech-Unreal-<version>.zip` | Unreal plugin: unzip into your project's `Plugins/` folder. |
+| `SpeedSpeech-native-<version>.zip` | The bare shared libraries plus `speedspeech.h`, for other engines. |
+
+You only need to build from source if you want to change SpeedSpeech itself.
+
 ## Repository layout
 
 ```
@@ -182,6 +195,18 @@ broadcasts `OnWord`, `OnViseme`, `OnSpeechStarted` and `OnSpeechFinished`.
   stand-in engine APIs (Mono for Unity; stub headers for Unreal). They have not yet been
   exercised inside the actual editors. Bug reports are welcome.
 - Unity WebGL has no `OnAudioFilterRead`, so use `SpeedSpeechSynth.CreateClip` there.
+
+## Making a release
+
+1. Bump the version in `bindings/unity/com.speedspeech.unity/package.json`,
+   `bindings/unreal/SpeedSpeech/SpeedSpeech.uplugin` (`VersionName`) and
+   `ss_version_string()` in `core/src/ss_engine.c`, plus the `SS_VERSION_*` macros in
+   `core/include/speedspeech.h`. Then run `python3 tools/amalgamate.py` and merge.
+2. On GitHub, go to **Releases → Draft a new release**, create a tag such as `v0.2.0` on
+   `main`, and publish.
+3. The **Release** workflow builds everything and attaches the downloads to the release
+   within a few minutes. It fails without attaching anything if the tag doesn't match the
+   version numbers above.
 
 ## License
 
